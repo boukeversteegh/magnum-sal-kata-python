@@ -9,21 +9,34 @@ class ApplicationException(Exception):
 
 class MagnumSal:
   def __init__(self, events: Events):
+    neighbor_view = NeighborView(events)
     self.events = events
-    self.miner_placement_service = MinerPlacementService(events)
-    self.miner_removal_service = MinerRemovalService(events)
+    self.miner_placement_service = MinerPlacementService(events, neighbor_view)
+    self.miner_removal_service = MinerRemovalService(events, neighbor_view)
 
   def add_chamber(self, x, y):
     self.events.append(ChamberAdded(x, y))
     pass
 
-  @staticmethod
-  def is_neighbor(ax, ay, bx, by):
-    return abs(ax - bx) + abs(ay - by) == 1
+
+class NeighborView:
+  def __init__(self, events: Events):
+    self.events = events
+
+  def get_neighbors(self, x, y):
+
+    def is_neighbor(a):
+      return abs(a.x - x) + abs(a.y - y) == 1
+
+    neighbors_placed = Counter(self.events.filter(MinerPlaced, is_neighbor, as_tuple=('x', 'y')))
+    neighbors_removed = Counter(self.events.filter(MinerRemoved, is_neighbor, as_tuple=('x', 'y')))
+    neighbors = neighbors_placed - neighbors_removed
+    return neighbors
 
 
 class MinerPlacementService:
-  def __init__(self, events):
+  def __init__(self, events, neighbor_view: NeighborView):
+    self.neighbor_view = neighbor_view
     self.events = events
 
   def place_miner(self, x, y):
@@ -35,10 +48,7 @@ class MinerPlacementService:
       )
 
     # if not at start, is there a neighboring miner near x, y?
-    is_neighbor = lambda a: MagnumSal.is_neighbor(x, y, *a)
-    neighbors_placed_count = Counter(self.events.filter(MinerPlaced, is_neighbor, as_tuple=('x', 'y')))
-    neighbors_removed_count = Counter(self.events.filter(MinerRemoved, is_neighbor, as_tuple=('x', 'y')))
-    neighbors = neighbors_placed_count - neighbors_removed_count
+    neighbors = self.neighbor_view.get_neighbors(x, y)
 
     if (x, y) != (0, 0) and not neighbors:
       raise ApplicationException(
@@ -49,7 +59,8 @@ class MinerPlacementService:
 
 
 class MinerRemovalService:
-  def __init__(self, events):
+  def __init__(self, events, neighbor_view: NeighborView):
+    self.neighbor_view = neighbor_view
     self.events = events
 
   def remove_miner(self, x, y):
@@ -69,11 +80,7 @@ class MinerRemovalService:
       raise ApplicationException("All miners at [%s, %s] were already removed" % (x, y))
 
     # Do we not break the chain?
-    is_neighbor = lambda a: MagnumSal.is_neighbor(x, y, *a)
-    neighbors_placed = Counter(events.filter(MinerPlaced, is_neighbor, as_tuple=('x', 'y')))
-    neighbors_removed = Counter(events.filter(MinerRemoved, is_neighbor, as_tuple=('x', 'y')))
-    neighbors = neighbors_placed - neighbors_removed
-
+    neighbors = self.neighbor_view.get_neighbors(x, y)
     in_chain = len(neighbors) == 2 or (x, y) == (0, 0) and len(neighbors) == 1
 
     if in_chain and miners_there == 1:
