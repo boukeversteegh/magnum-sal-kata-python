@@ -22,15 +22,14 @@ class MinerPlacementService:
 
   def place_miner(self, x, y):
     # is there a chamber at x, y?
-    chambers = [e for e in self.events if isinstance(e, ChamberAdded) and e.x == x and e.y == y]
+    chambers = self.events.filter(ChamberAdded, x=x, y=y)
     if not chambers:
       raise ApplicationException(
         "There was no chamber at %s, %s, so you cannot place a miner there" % (x, y)
       )
 
     # if not at start, is there a neighboring miner near x, y?
-    neighboring_miners = [mp for mp in self.events if
-                          isinstance(mp, MinerPlaced) and abs(mp.x - x) + abs(mp.y - y) == 1]
+    neighboring_miners = self.events.filter(MinerPlaced, lambda mp: abs(mp.x - x) + abs(mp.y - y) == 1)
     if (x, y) != (0, 0) and not neighboring_miners:
       raise ApplicationException(
         "You cannot place a miner at [%s, %s] because there are no neighbors there" % (x, y)
@@ -47,12 +46,12 @@ class MinerRemovalService:
     events = self.events
 
     # is there a miner at x, y
-    miners_placed_there = events.filter(MinerPlaced, lambda e: e.x == x and e.y == y)
+    miners_placed_there = events.filter(MinerPlaced, x=x, y=y)
 
     if not miners_placed_there:
       raise ApplicationException("There was no miner to be removed at [%s, %s]" % (x, y))
 
-    miners_removed_there = [mp for mp in events if isinstance(mp, MinerRemoved) and mp.x == x and mp.y == y]
+    miners_removed_there = events.filter(MinerRemoved, x=x, y=y)
 
     # Are there miners left, after considering removals?
     miners_there = len(miners_placed_there) - len(miners_removed_there)
@@ -70,10 +69,8 @@ class MinerRemovalService:
     chambers_with_neighbors = 0
     # if there are neighbors on 2 sides, then we're in the middle of a chain
     for ndx, ndy in neighbors_dxdy:
-      n_miners_placed = [mp for mp in events if
-                         isinstance(mp, MinerPlaced) and mp.x == x + ndx and mp.y == y + ndy]
-      n_miners_removed = [mr for mr in events if
-                          isinstance(mr, MinerRemoved) and mr.x == x + ndx and mr.y == y + ndy]
+      n_miners_placed = events.filter(MinerPlaced, x=x + ndx, y=y + ndy)
+      n_miners_removed = events.filter(MinerRemoved, x=x + ndx, y=y + ndy)
       n_has_neighbor = len(n_miners_placed) - len(n_miners_removed) > 0
 
       if n_has_neighbor:
