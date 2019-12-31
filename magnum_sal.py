@@ -17,6 +17,10 @@ class MagnumSal:
     self.events.append(ChamberAdded(x, y))
     pass
 
+  @staticmethod
+  def is_neighbor(ax, ay, bx, by):
+    return abs(ax - bx) + abs(ay - by) == 1
+
 
 class MinerPlacementService:
   def __init__(self, events):
@@ -30,22 +34,13 @@ class MinerPlacementService:
         "There was no chamber at %s, %s, so you cannot place a miner there" % (x, y)
       )
 
-    def manhattan(a, x, y):
-      return abs(a.x - x) + abs(a.y - y)
-
-    def is_neighbor(a):
-      return manhattan(a, x, y) == 1
-
     # if not at start, is there a neighboring miner near x, y?
-    neighbors_placed = self.events.filter(MinerPlaced, is_neighbor, as_tuple=('x', 'y'))
-    neighbors_removed = self.events.filter(MinerRemoved, is_neighbor, as_tuple=('x', 'y'))
+    is_neighbor = lambda a: MagnumSal.is_neighbor(x, y, *a)
+    neighbors_placed_count = Counter(self.events.filter(MinerPlaced, is_neighbor, as_tuple=('x', 'y')))
+    neighbors_removed_count = Counter(self.events.filter(MinerRemoved, is_neighbor, as_tuple=('x', 'y')))
+    neighbors = neighbors_placed_count - neighbors_removed_count
 
-    neighbors_placed_count = Counter(neighbors_placed)
-    neighbors_removed_count = Counter(neighbors_removed)
-
-    neighbors_left = neighbors_placed_count - neighbors_removed_count
-
-    if (x, y) != (0, 0) and not neighbors_left:
+    if (x, y) != (0, 0) and not neighbors:
       raise ApplicationException(
         "You cannot place a miner at [%s, %s] because there are no neighbors there" % (x, y)
       )
@@ -74,28 +69,14 @@ class MinerRemovalService:
       raise ApplicationException("All miners at [%s, %s] were already removed" % (x, y))
 
     # Do we not break the chain?
-    neighbors_dxdy = [
-      (-1, 0),
-      (1, 0),
-      (0, 1),
-      (0, -1)
-    ]
+    is_neighbor = lambda a: MagnumSal.is_neighbor(x, y, *a)
+    neighbors_placed = Counter(events.filter(MinerPlaced, is_neighbor, as_tuple=('x', 'y')))
+    neighbors_removed = Counter(events.filter(MinerRemoved, is_neighbor, as_tuple=('x', 'y')))
+    neighbors = neighbors_placed - neighbors_removed
 
-    chambers_with_neighbors = 0
-    # if there are neighbors on 2 sides, then we're in the middle of a chain
-    for ndx, ndy in neighbors_dxdy:
-      n_miners_placed = events.filter(MinerPlaced, x=x + ndx, y=y + ndy)
-      n_miners_removed = events.filter(MinerRemoved, x=x + ndx, y=y + ndy)
-      n_has_neighbor = len(n_miners_placed) - len(n_miners_removed) > 0
-
-      if n_has_neighbor:
-        chambers_with_neighbors += 1
-
-    in_chain = chambers_with_neighbors == 2 or (x, y) == (0, 0) and chambers_with_neighbors == 1
+    in_chain = len(neighbors) == 2 or (x, y) == (0, 0) and len(neighbors) == 1
 
     if in_chain and miners_there == 1:
       raise ApplicationException("You cannot remove a miner from the middle of a chain at [%s, %s]" % (x, y))
 
     events.append(MinerRemoved(x, y))
-
-
