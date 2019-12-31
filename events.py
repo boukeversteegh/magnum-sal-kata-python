@@ -29,7 +29,7 @@ class Events(List):
   def append(self, event):
     super().append(event)
 
-  def filter(self, event_type=None, cb=None, **kwargs):
+  def filter(self, event_type=None, cb=None, as_tuple=None, **kwargs):
     def apply_property_filters(e):
       for key, value in kwargs.items():
         if getattr(e, key) != value:
@@ -38,7 +38,8 @@ class Events(List):
 
     def _filter(e):
       return isinstance(e, event_type) and (not cb or cb(e)) and (not kwargs or apply_property_filters(e))
-    return [e for e in self.__iter__() if _filter(e)]
+
+    return [e if not as_tuple else tuple(getattr(e, attribute) for attribute in as_tuple) for e in self.__iter__() if _filter(e)]
 
   def __contains__(self, item):
     return item in self.filter(type(item))

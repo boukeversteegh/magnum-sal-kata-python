@@ -208,3 +208,35 @@ class Tests(unittest.TestCase):
 
     self.assertRaises(ApplicationException,
                       lambda: game.miner_removal_service.remove_miner(0, 0))
+
+  def test_cannot_place_a_miner_after_a_chamber_where_the_last_miner_was_removed(self):
+    events = Events([
+      ChamberAdded(0, 0),
+      ChamberAdded(0, 1),
+      ChamberAdded(0, 2),
+      MinerPlaced(0, 0),
+      MinerPlaced(0, 1),
+      MinerRemoved(0, 1),
+    ])
+
+    game = MagnumSal(events)
+
+    self.assertRaises(ApplicationException,
+                      lambda: game.miner_placement_service.place_miner(0, 2))
+
+  def test_can_place_a_miner_after_a_chamber_where_the_last_miner_was_replaced(self):
+    events = Events([
+      ChamberAdded(0, 0),
+      ChamberAdded(0, 1),
+      ChamberAdded(0, 2),
+      MinerPlaced(0, 0),
+      MinerPlaced(0, 1),
+      MinerRemoved(0, 1),
+      MinerPlaced(0, 1),
+    ])
+
+    game = MagnumSal(events)
+
+    game.miner_placement_service.place_miner(0, 2)
+
+    self.assertIn(MinerPlaced(0, 2), events)

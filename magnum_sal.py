@@ -1,3 +1,5 @@
+from collections import Counter
+
 from events import ChamberAdded, MinerPlaced, MinerRemoved, Events
 
 
@@ -28,9 +30,22 @@ class MinerPlacementService:
         "There was no chamber at %s, %s, so you cannot place a miner there" % (x, y)
       )
 
+    def manhattan(a, x, y):
+      return abs(a.x - x) + abs(a.y - y)
+
+    def is_neighbor(a):
+      return manhattan(a, x, y) == 1
+
     # if not at start, is there a neighboring miner near x, y?
-    neighboring_miners = self.events.filter(MinerPlaced, lambda mp: abs(mp.x - x) + abs(mp.y - y) == 1)
-    if (x, y) != (0, 0) and not neighboring_miners:
+    neighbors_placed = self.events.filter(MinerPlaced, is_neighbor, as_tuple=('x', 'y'))
+    neighbors_removed = self.events.filter(MinerRemoved, is_neighbor, as_tuple=('x', 'y'))
+
+    neighbors_placed_count = Counter(neighbors_placed)
+    neighbors_removed_count = Counter(neighbors_removed)
+
+    neighbors_left = neighbors_placed_count - neighbors_removed_count
+
+    if (x, y) != (0, 0) and not neighbors_left:
       raise ApplicationException(
         "You cannot place a miner at [%s, %s] because there are no neighbors there" % (x, y)
       )
